@@ -11,7 +11,7 @@ Answer six questions about your current feeling — how it feels, your energy le
 ## Features
 
 - No installation, no internet required — just open the HTML file in any browser
-- Nearly 100 emotions scored across six psychological dimensions
+- 124 emotions scored across six psychological dimensions
 - Built-in editor (click the ⊕ in the bottom right corner) to add, edit, or remove emotions
 - Theme customization
 - Export as a clean quiz-only version or a full editable version
