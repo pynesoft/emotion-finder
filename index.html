@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Emotion Finder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#1e1e2e; --card:#2a2a3e; --accent:#a78bfa; --accent2:#f472b6;
+      --text:#e2e8f0; --subtext:#94a3b8; --btn:#3b3b5c; --btnhov:#4c4c72;
+      --green:#4ade80; --yellow:#facc15; --orange:#fb923c; --radius:12px;
+    }
+    body { background:var(--bg); color:var(--text); font-family:"Segoe UI",system-ui,sans-serif;
+      min-height:100vh; display:flex; justify-content:center; align-items:flex-start; padding:40px 16px 80px; }
+    .shell { width:100%; max-width:540px; position:relative; }
+    header { text-align:center; margin-bottom:24px; }
+    header h1 { font-size:1.9rem; color:var(--accent); }
+    header p  { color:var(--subtext); margin-top:6px; font-size:0.93rem; }
+
+    /* ── Progress ── */
+    .progress-area { margin-bottom:16px; }
+    .progress-label { text-align:right; font-size:0.8rem; color:var(--subtext); margin-bottom:4px; }
+    .progress-track { height:6px; background:var(--btn); border-radius:99px; overflow:hidden; }
+    .progress-fill  { height:100%; background:var(--accent); border-radius:99px; transition:width .35s ease; }
+    .card { background:var(--card); border-radius:var(--radius); padding:24px 24px 20px; margin-bottom:20px; }
+    .question-text { font-size:1.1rem; line-height:1.5; margin-bottom:18px; }
+
+    /* ── Slider ── */
+    .scale-labels { display:flex; justify-content:space-between; font-size:0.78rem;
+      color:var(--subtext); margin-bottom:14px; padding:0 2px; line-height:1.4; }
+    .slider { -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:99px;
+      background:var(--btn); outline:none; cursor:pointer; }
+    .slider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none;
+      width:28px; height:28px; border-radius:50%; background:var(--accent); cursor:pointer;
+      border:3px solid #1e1e2e; box-shadow:0 0 0 2px var(--accent); }
+    .slider::-moz-range-thumb { width:28px; height:28px; border-radius:50%;
+      background:var(--accent); cursor:pointer; border:3px solid #1e1e2e; }
+    .slider:focus::-webkit-slider-thumb { box-shadow:0 0 0 5px rgba(167,139,250,.35); }
+    .slider-val { text-align:center; font-size:1.4rem; font-weight:700;
+      color:var(--accent); margin-top:14px; min-height:2rem; }
+
+    /* ── Nav ── */
+    .nav-row { display:flex; gap:10px; }
+    #back-btn { padding:13px 20px; background:var(--btn); color:var(--subtext);
+      border:none; border-radius:var(--radius); font-size:1rem; font-weight:700;
+      cursor:pointer; transition:background .15s; }
+    #back-btn:hover { background:var(--btnhov); color:var(--text); }
+    #back-btn:disabled { opacity:.25; cursor:not-allowed; }
+    #next-btn { flex:1; display:block; width:100%; padding:13px;
+      background:var(--accent); color:white; border:none;
+      border-radius:var(--radius); font-size:1rem; font-weight:700;
+      cursor:pointer; transition:background .15s, opacity .15s; }
+    #next-btn:disabled { opacity:.35; cursor:not-allowed; }
+    #next-btn:not(:disabled):hover { background:var(--accent2); }
+
+    /* ── Results ── */
+    #results { display:none; }
+    .result-heading { text-align:center; color:var(--subtext); font-size:1rem; margin-bottom:16px; }
+    .result-card { background:var(--card); border-radius:var(--radius);
+      padding:20px 24px; margin-bottom:14px; border-left:4px solid; }
+    .result-card.first  { border-color:var(--green);  }
+    .result-card.second { border-color:var(--yellow); }
+    .result-card.third  { border-color:var(--orange); }
+    .result-rank { font-size:.75rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
+    .result-card.first  .result-rank { color:var(--green);  }
+    .result-card.second .result-rank { color:var(--yellow); }
+    .result-card.third  .result-rank { color:var(--orange); }
+    .result-name { font-size:1.5rem; font-weight:700; margin-bottom:6px; }
+    .result-card.first  .result-name { color:var(--green);  }
+    .result-card.second .result-name { color:var(--yellow); }
+    .result-card.third  .result-name { color:var(--orange); }
+    .result-desc { font-size:.93rem; color:var(--text); line-height:1.5; }
+    #again-btn { display:block; width:100%; padding:13px; background:var(--btn); color:var(--text);
+      border:none; border-radius:var(--radius); font-size:1rem; font-weight:700;
+      cursor:pointer; margin-top:20px; transition:background .15s; }
+    #again-btn:hover { background:var(--btnhov); }
+
+    /* ── Hidden trigger ── */
+    #editor-trigger {
+      position:fixed; bottom:18px; right:18px;
+      font-size:1.3rem; color:var(--btn); cursor:pointer;
+      transition:color .3s; user-select:none; line-height:1;
+      opacity:0.4;
+    }
+    #editor-trigger:hover { color:var(--accent); opacity:1; }
+
+    /* ── Editor overlay ── */
+    #editor-overlay {
+      display:none; position:fixed; inset:0; background:rgba(0,0,0,.7);
+      z-index:100; justify-content:center; align-items:flex-start;
+      padding:20px 12px 40px; overflow-y:auto;
+    }
+    #editor-overlay.open { display:flex; }
+    #editor-shell { background:var(--bg); border-radius:16px; width:100%; max-width:860px;
+      padding:24px; position:relative; }
+    #editor-shell h2 { color:var(--accent); font-size:1.4rem; margin-bottom:6px; }
+    #editor-shell > p { color:var(--subtext); font-size:.85rem; margin-bottom:20px; }
+
+    /* tabs */
+    .ed-tabs { display:flex; gap:8px; margin-bottom:20px; }
+    .ed-tab { padding:8px 18px; border-radius:8px; border:none; background:var(--btn);
+      color:var(--subtext); font-size:.9rem; font-weight:600; cursor:pointer; transition:all .15s; }
+    .ed-tab.active { background:var(--accent); color:#1e1e2e; }
+
+    /* emotions tab */
+    #ed-emotions { display:flex; gap:16px; }
+    #em-list-wrap { width:220px; flex-shrink:0; }
+    #em-search { width:100%; padding:9px 12px; background:var(--card); border:1px solid var(--btn);
+      border-radius:8px; color:var(--text); font-size:.9rem; margin-bottom:10px; outline:none; }
+    #em-search:focus { border-color:var(--accent); }
+    #em-list { height:420px; overflow-y:auto; border-radius:8px; background:var(--card); }
+    .em-item { padding:10px 14px; cursor:pointer; font-size:.88rem; border-bottom:1px solid var(--btn);
+      transition:background .1s; color:var(--text); }
+    .em-item:hover { background:var(--btnhov); }
+    .em-item.selected { background:var(--accent); color:#1e1e2e; font-weight:700; }
+    #em-add-btn { width:100%; margin-top:8px; padding:9px; background:var(--btn); color:var(--text);
+      border:none; border-radius:8px; font-size:.88rem; font-weight:600; cursor:pointer; }
+    #em-add-btn:hover { background:var(--btnhov); }
+
+    /* edit panel */
+    #em-edit-panel { flex:1; background:var(--card); border-radius:12px; padding:20px; }
+    #em-edit-panel.empty { display:flex; align-items:center; justify-content:center;
+      color:var(--subtext); font-size:.95rem; min-height:300px; }
+    .ed-field { margin-bottom:16px; }
+    .ed-label { font-size:.78rem; color:var(--subtext); font-weight:600; letter-spacing:.5px;
+      text-transform:uppercase; margin-bottom:6px; }
+    .ed-input { width:100%; padding:9px 12px; background:var(--bg); border:1px solid var(--btn);
+      border-radius:8px; color:var(--text); font-size:.93rem; outline:none; }
+    .ed-input:focus { border-color:var(--accent); }
+    textarea.ed-input { resize:vertical; min-height:70px; font-family:inherit; }
+
+    /* dimension sliders in editor */
+    .dim-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    .dim-label { width:90px; font-size:.8rem; color:var(--subtext); flex-shrink:0; }
+    .dim-slider { flex:1; -webkit-appearance:none; appearance:none; height:4px;
+      border-radius:99px; background:var(--btn); outline:none; cursor:pointer; }
+    .dim-slider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none;
+      width:18px; height:18px; border-radius:50%; background:var(--accent); cursor:pointer;
+      border:2px solid #1e1e2e; }
+    .dim-slider::-moz-range-thumb { width:18px; height:18px; border-radius:50%;
+      background:var(--accent); cursor:pointer; border:2px solid #1e1e2e; }
+    .dim-val { width:28px; text-align:center; font-size:.85rem; font-weight:700; color:var(--accent); }
+
+    /* radar */
+    #radar-wrap { margin:16px 0 10px; display:flex; justify-content:center; }
+
+    /* edit actions */
+    .ed-actions { display:flex; gap:8px; margin-top:16px; }
+    .ed-save-btn { flex:1; padding:10px; background:var(--accent); color:#1e1e2e;
+      border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:.9rem; }
+    .ed-save-btn:hover { background:var(--accent2); }
+    .ed-del-btn { padding:10px 16px; background:var(--btn); color:#f87171;
+      border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:.9rem; }
+    .ed-del-btn:hover { background:#3d2a2a; }
+
+    /* theme tab */
+    #ed-theme { display:none; }
+    #ed-theme.active { display:block; }
+    .theme-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:440px; }
+    .theme-row { display:flex; align-items:center; justify-content:space-between;
+      background:var(--card); padding:12px 16px; border-radius:10px; }
+    .theme-name { font-size:.88rem; color:var(--text); }
+    .theme-sub  { font-size:.75rem; color:var(--subtext); margin-top:2px; }
+    input[type=color] { width:40px; height:32px; border:none; border-radius:6px;
+      cursor:pointer; background:none; padding:0; }
+
+    /* export */
+    #ed-export-row { margin-top:20px; display:flex; gap:10px; align-items:center; }
+    #ed-export-btn { padding:11px 24px; background:var(--green); color:#1e1e2e;
+      border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:.93rem; }
+    #ed-export-btn:hover { filter:brightness(1.1); }
+    #ed-export-clean-btn { padding:11px 24px; background:var(--btn); color:var(--text);
+      border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:.93rem; }
+    #ed-export-clean-btn:hover { background:var(--btnhov); }
+    #ed-close-btn { padding:11px 16px; background:var(--btn); color:var(--subtext);
+      border:none; border-radius:8px; font-weight:700; cursor:pointer; font-size:.93rem; }
+    #ed-close-btn:hover { color:var(--text); background:var(--btnhov); }
+    #export-msg { font-size:.82rem; color:var(--green); margin-left:8px; opacity:0; transition:opacity .4s; }
+
+    /* scrollbar */
+    #em-list::-webkit-scrollbar { width:6px; }
+    #em-list::-webkit-scrollbar-track { background:transparent; }
+    #em-list::-webkit-scrollbar-thumb { background:var(--btn); border-radius:99px; }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <h1>🧭 Emotion Finder</h1>
+    <p>Answer 6 questions — I'll name what you're feeling.</p>
+  </header>
+
+  <div id="quiz">
+    <div class="progress-area">
+      <div class="progress-label" id="prog-label">Question 1 of 6</div>
+      <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <div class="question-text" id="q-text"></div>
+      <div class="scale-labels" id="scale-labels"></div>
+      <input type="range" class="slider" id="slider" min="-3" max="3" step="1" value="0">
+      <div class="slider-val" id="slider-val">0 <span>— Neutral</span></div>
+    </div>
+    <div class="nav-row">
+      <button id="back-btn" disabled>← Back</button>
+      <button id="next-btn">Next →</button>
+    </div>
+  </div>
+
+  <div id="results">
+    <p class="result-heading">You might be feeling…</p>
+    <div id="result-cards"></div>
+    <button id="again-btn">↺ Try Again</button>
+  </div>
+</div>
+
+<!-- Hidden editor trigger -->
+<div id="editor-trigger" title="">⊕</div>
+
+<!-- Editor overlay -->
+<div id="editor-overlay">
+  <div id="editor-shell">
+    <h2>⊕ Emotion Editor</h2>
+    <p>Edit emotions, adjust dimensional scores, or customize the theme. Export when done.</p>
+
+    <div class="ed-tabs">
+      <button class="ed-tab active" data-tab="emotions">Emotions</button>
+      <button class="ed-tab" data-tab="theme">Theme</button>
+    </div>
+
+    <!-- Emotions tab -->
+    <div id="ed-emotions">
+      <div id="em-list-wrap">
+        <input type="text" id="em-search" placeholder="Search emotions…" autocomplete="off">
+        <div id="em-list"></div>
+        <button id="em-add-btn">+ New Emotion</button>
+      </div>
+      <div id="em-edit-panel" class="empty">
+        <span>← Select an emotion to edit</span>
+      </div>
+    </div>
+
+    <!-- Theme tab -->
+    <div id="ed-theme">
+      <div class="theme-grid">
+        <div class="theme-row">
+          <div><div class="theme-name">Background</div><div class="theme-sub">--bg</div></div>
+          <input type="color" id="tc-bg">
+        </div>
+        <div class="theme-row">
+          <div><div class="theme-name">Card</div><div class="theme-sub">--card</div></div>
+          <input type="color" id="tc-card">
+        </div>
+        <div class="theme-row">
+          <div><div class="theme-name">Accent</div><div class="theme-sub">--accent</div></div>
+          <input type="color" id="tc-accent">
+        </div>
+        <div class="theme-row">
+          <div><div class="theme-name">Accent 2</div><div class="theme-sub">--accent2</div></div>
+          <input type="color" id="tc-accent2">
+        </div>
+        <div class="theme-row">
+          <div><div class="theme-name">Text</div><div class="theme-sub">--text</div></div>
+          <input type="color" id="tc-text">
+        </div>
+        <div class="theme-row">
+          <div><div class="theme-name">Button</div><div class="theme-sub">--btn</div></div>
+          <input type="color" id="tc-btn">
+        </div>
+      </div>
+    </div>
+
+    <div id="ed-export-row">
+      <button id="ed-export-btn">⬇ Export with Editor</button>
+      <button id="ed-export-clean-btn">⬇ Export Clean</button>
+      <button id="ed-close-btn">Close</button>
+      <span id="export-msg">Exported!</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Sanitize: strip HTML-dangerous chars from text fields ──────────────────
+function sanitize(str) {
+  return String(str)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#39;")
+    .replace(/`/g,"&#96;")
+    .replace(/\\/g,"&#92;");
+}
+function sanitizeNum(val, min, max) {
+  const n = parseInt(val, 10);
+  if (isNaN(n)) return 0;
+  return Math.max(min, Math.min(max, n));
+}
+
+// ── Emotion data ───────────────────────────────────────────────────────────
+let EMOTIONS = [{"e":"Joy","d":"A bright uplifting feeling of happiness and delight","v":3,"n":3,"s":2,"a":2,"c":2,"aa":3},{"e":"Excitement","d":"High energy anticipation or enthusiasm about something","v":3,"n":3,"s":2,"a":2,"c":0,"aa":3},{"e":"Love","d":"Warm deep affection and connection toward someone","v":3,"n":2,"s":3,"a":2,"c":2,"aa":3},{"e":"Gratitude","d":"Appreciation for something good someone did or gave you","v":3,"n":2,"s":3,"a":2,"c":3,"aa":3},{"e":"Pride","d":"Satisfaction from your own achievement or identity","v":3,"n":2,"s":2,"a":3,"c":3,"aa":3},{"e":"Contentment","d":"Quiet satisfied sense that things are okay right now","v":3,"n":-2,"s":0,"a":2,"c":2,"aa":2},{"e":"Relief","d":"Tension releasing after a threat or worry has passed","v":3,"n":0,"s":0,"a":2,"c":3,"aa":2},{"e":"Hope","d":"Positive anticipation about an uncertain future outcome","v":2,"n":2,"s":0,"a":0,"c":-2,"aa":3},{"e":"Awe","d":"Overwhelming sense of wonder at something vast or profound","v":2,"n":2,"s":0,"a":-2,"c":0,"aa":2},{"e":"Curiosity","d":"Engaged desire to learn or explore something unknown","v":2,"n":2,"s":0,"a":2,"c":-2,"aa":3},{"e":"Nostalgia","d":"Bittersweet longing for a meaningful past experience","v":2,"n":-2,"s":2,"a":0,"c":3,"aa":2},{"e":"Calm","d":"Peaceful settled feeling with no urgency or threat","v":2,"n":-2,"s":0,"a":2,"c":2,"aa":2},{"e":"Boredom","d":"Flat restless feeling when nothing feels engaging or meaningful","v":-2,"n":-3,"s":-2,"a":0,"c":3,"aa":-2},{"e":"Loneliness","d":"Painful sense of being disconnected or unseen by others","v":-2,"n":-2,"s":-3,"a":-2,"c":3,"aa":-2},{"e":"Melancholy","d":"Gentle persistent sadness without a sharp cause","v":-2,"n":-2,"s":0,"a":-2,"c":2,"aa":-2},{"e":"Embarrassment","d":"Self-conscious discomfort from being seen doing something awkward","v":-2,"n":2,"s":3,"a":-2,"c":3,"aa":-3},{"e":"Envy","d":"Wanting what someone else has and feeling lesser for it","v":-2,"n":0,"s":3,"a":-3,"c":3,"aa":2},{"e":"Jealousy","d":"Fear of losing someone important to a rival or competitor","v":-2,"n":2,"s":3,"a":-2,"c":3,"aa":2},{"e":"Contempt","d":"Feeling of superiority and dismissal toward someone else","v":-2,"n":0,"s":3,"a":2,"c":3,"aa":-2},{"e":"Worry","d":"Repetitive anxious thinking about something that might go wrong","v":-2,"n":2,"s":0,"a":-2,"c":-2,"aa":-2},{"e":"Frustration","d":"Blocked from a goal you feel you should be able to reach","v":-3,"n":3,"s":2,"a":-2,"c":3,"aa":3},{"e":"Anxiety","d":"Dread or unease about something uncertain or threatening","v":-3,"n":2,"s":0,"a":-3,"c":-2,"aa":-3},{"e":"Overwhelm","d":"Too much coming at once and no clear way to handle it","v":-3,"n":3,"s":0,"a":-3,"c":-3,"aa":-3},{"e":"Guilt","d":"Distress from believing you did something wrong or harmful","v":-3,"n":0,"s":3,"a":-2,"c":3,"aa":-2},{"e":"Shame","d":"Deep sense that something is wrong with you as a person","v":-3,"n":-2,"s":2,"a":-3,"c":3,"aa":-3},{"e":"Disappointment","d":"Sadness when an expectation or hope was not met","v":-3,"n":-2,"s":3,"a":-2,"c":3,"aa":-2},{"e":"Sadness","d":"Heaviness and sorrow often from loss or pain","v":-3,"n":-2,"s":0,"a":-2,"c":2,"aa":-2},{"e":"Grief","d":"Deep anguish from losing someone or something deeply important","v":-3,"n":-2,"s":3,"a":-3,"c":3,"aa":-2},{"e":"Anger","d":"Hot reactive feeling when something feels unfair or violating","v":-3,"n":3,"s":2,"a":-2,"c":3,"aa":3},{"e":"Rage","d":"Intense uncontrolled anger that feels consuming","v":-3,"n":3,"s":2,"a":-3,"c":3,"aa":3},{"e":"Fear","d":"Alert dread response to a perceived threat or danger","v":-3,"n":2,"s":0,"a":-3,"c":-2,"aa":-3},{"e":"Terror","d":"Extreme overwhelming fear with a strong survival response","v":-3,"n":3,"s":0,"a":-3,"c":-2,"aa":-3},{"e":"Disgust","d":"Strong aversion to something that feels wrong or contaminating","v":-3,"n":2,"s":2,"a":0,"c":3,"aa":-3},{"e":"Numbness","d":"Flat absence of feeling often after emotional overload","v":0,"n":-3,"s":-2,"a":-2,"c":0,"aa":0},{"e":"Confusion","d":"Disoriented state when things don't make sense or feel unclear","v":0,"n":0,"s":0,"a":-2,"c":-3,"aa":-2},{"e":"Helplessness","d":"Feeling trapped with no good options and no way forward","v":-3,"n":-2,"s":0,"a":-3,"c":0,"aa":-3},{"e":"Lust","d":"Intense physical desire and attraction toward someone","v":2,"n":3,"s":3,"a":2,"c":3,"aa":3},{"e":"Infatuation","d":"Consuming obsessive pull toward someone you can't stop thinking about","v":2,"n":3,"s":3,"a":-2,"c":-2,"aa":3},{"e":"Tenderness","d":"Soft warm feeling of care and gentleness toward someone","v":3,"n":0,"s":3,"a":2,"c":2,"aa":3},{"e":"Longing","d":"Aching desire for someone or something you can't have right now","v":0,"n":2,"s":3,"a":-2,"c":2,"aa":2},{"e":"Desire","d":"Motivated wanting and craving for something or someone","v":2,"n":3,"s":2,"a":2,"c":2,"aa":3},{"e":"Adoration","d":"Deep loving admiration for someone you hold in high regard","v":3,"n":2,"s":3,"a":0,"c":3,"aa":3},{"e":"Passion","d":"Intense driving feeling that merges love and energy and purpose","v":3,"n":3,"s":3,"a":2,"c":2,"aa":3},{"e":"Yearning","d":"Deep painful pull toward something or someone out of reach","v":-2,"n":2,"s":3,"a":-3,"c":2,"aa":2},{"e":"Playfulness","d":"Light fun energy that wants to joke and explore without pressure","v":3,"n":3,"s":2,"a":2,"c":2,"aa":3},{"e":"Euphoria","d":"Intense overwhelming rush of joy that feels almost too big to contain","v":3,"n":3,"s":0,"a":2,"c":0,"aa":3},{"e":"Serenity","d":"Deep quiet peace that feels stable and unhurried","v":3,"n":-2,"s":0,"a":2,"c":2,"aa":2},{"e":"Satisfaction","d":"Solid sense of having done or received something that was enough","v":3,"n":0,"s":0,"a":3,"c":3,"aa":3},{"e":"Enthusiasm","d":"Energized forward-leaning feeling about something you care about","v":3,"n":3,"s":0,"a":3,"c":2,"aa":3},{"e":"Inspiration","d":"Sudden uplifting feeling that makes you want to create or act","v":3,"n":3,"s":0,"a":2,"c":-2,"aa":3},{"e":"Wonder","d":"Open-hearted amazement at something beautiful or surprising","v":3,"n":2,"s":0,"a":0,"c":-2,"aa":3},{"e":"Amusement","d":"Light enjoyment and pleasure from something funny or clever","v":3,"n":2,"s":2,"a":2,"c":3,"aa":3},{"e":"Delight","d":"Bright sparkling pleasure from something unexpectedly lovely","v":3,"n":3,"s":2,"a":2,"c":3,"aa":3},{"e":"Bliss","d":"Floating effortless happiness with no edge or tension in it","v":3,"n":0,"s":2,"a":2,"c":2,"aa":3},{"e":"Confidence","d":"Solid trust in your own ability to handle what's in front of you","v":3,"n":2,"s":0,"a":3,"c":3,"aa":3},{"e":"Empowerment","d":"Energized sense that you have the strength and right to act","v":3,"n":3,"s":0,"a":3,"c":2,"aa":3},{"e":"Determination","d":"Firm committed focus on seeing something through no matter what","v":2,"n":3,"s":0,"a":3,"c":2,"aa":3},{"e":"Courage","d":"Moving forward despite fear because something matters more than safety","v":2,"n":3,"s":2,"a":3,"c":-2,"aa":3},{"e":"Anticipation","d":"Alert leaning-forward feeling about something coming up","v":2,"n":3,"s":0,"a":2,"c":-2,"aa":3},{"e":"Surprise","d":"Sudden jolt when reality doesn't match what you expected","v":0,"n":3,"s":0,"a":0,"c":-3,"aa":0},{"e":"Acceptance","d":"Settled willingness to let something be what it is without fighting it","v":2,"n":-2,"s":0,"a":2,"c":3,"aa":2},{"e":"Forgiveness","d":"Releasing resentment toward someone who hurt you","v":2,"n":0,"s":3,"a":2,"c":3,"aa":2},{"e":"Compassion","d":"Warm concern for someone else's pain and a desire to ease it","v":2,"n":0,"s":3,"a":2,"c":2,"aa":3},{"e":"Sympathy","d":"Feeling sorrow for someone else's difficulty from a slight distance","v":2,"n":0,"s":3,"a":0,"c":3,"aa":2},{"e":"Admiration","d":"Warm positive regard for someone's qualities or achievements","v":3,"n":2,"s":3,"a":0,"c":3,"aa":3},{"e":"Respect","d":"Recognizing the worth or rights of someone and treating them accordingly","v":2,"n":0,"s":3,"a":2,"c":3,"aa":2},{"e":"Trust","d":"Feeling safe enough to be open and rely on someone else","v":3,"n":0,"s":3,"a":2,"c":2,"aa":3},{"e":"Belonging","d":"Feeling genuinely included and accepted by a group or person","v":3,"n":0,"s":3,"a":0,"c":2,"aa":3},{"e":"Safety","d":"Absence of threat and the felt sense that you are protected","v":3,"n":-2,"s":0,"a":2,"c":3,"aa":2},{"e":"Vulnerability","d":"Open exposed feeling from letting yourself be seen honestly","v":0,"n":0,"s":2,"a":-2,"c":-2,"aa":0},{"e":"Ambivalence","d":"Genuinely pulled in two directions at once with no clear winner","v":0,"n":0,"s":2,"a":-2,"c":-2,"aa":0},{"e":"Regret","d":"Wishing you had made a different choice in the past","v":-2,"n":-2,"s":0,"a":-2,"c":3,"aa":-2},{"e":"Remorse","d":"Deep sorrow specifically because your actions hurt someone else","v":-3,"n":0,"s":3,"a":-2,"c":3,"aa":-2},{"e":"Resentment","d":"Smoldering ongoing anger about something that still feels unresolved","v":-2,"n":2,"s":3,"a":-2,"c":3,"aa":2},{"e":"Bitterness","d":"Hardened cold feeling from hurt that was never repaired or acknowledged","v":-2,"n":0,"s":3,"a":-2,"c":3,"aa":-2},{"e":"Suspicion","d":"Watchful uneasy feeling that someone may have bad intentions","v":-2,"n":2,"s":3,"a":-2,"c":-2,"aa":-2},{"e":"Paranoia","d":"Consuming belief that others are against you in ways you can't prove","v":-3,"n":3,"s":3,"a":-3,"c":-2,"aa":-3},{"e":"Dread","d":"Slow creeping fear about something bad that feels inevitable","v":-3,"n":2,"s":0,"a":-3,"c":-2,"aa":-3},{"e":"Despair","d":"Total loss of hope with no sense that things can get better","v":-3,"n":-3,"s":0,"a":-3,"c":3,"aa":-3},{"e":"Apathy","d":"Complete lack of interest or motivation about things that used to matter","v":0,"n":-3,"s":0,"a":0,"c":2,"aa":0},{"e":"Restlessness","d":"Edgy unable-to-settle feeling with no clear outlet","v":-2,"n":3,"s":0,"a":0,"c":-2,"aa":0},{"e":"Impatience","d":"Irritated urgency when things are moving too slowly","v":-2,"n":3,"s":0,"a":0,"c":3,"aa":3},{"e":"Irritability","d":"Low threshold state where small things spark outsized annoyance","v":-2,"n":3,"s":2,"a":-2,"c":0,"aa":3},{"e":"Cynicism","d":"Hardened disbelief that people or situations can be genuinely good","v":-2,"n":0,"s":3,"a":0,"c":3,"aa":-2},{"e":"Humiliation","d":"Crushing public exposure of something you desperately wanted to hide","v":-3,"n":2,"s":3,"a":-3,"c":3,"aa":-3},{"e":"Powerlessness","d":"Knowing something is wrong and having no ability to change it","v":-3,"n":-2,"s":2,"a":-3,"c":2,"aa":-3},{"e":"Disillusionment","d":"Deflated feeling when something you believed in turns out to be false","v":-2,"n":-2,"s":3,"a":-2,"c":3,"aa":-2},{"e":"Homesickness","d":"Aching for a place or time that felt like home and safety","v":-2,"n":-2,"s":3,"a":-2,"c":3,"aa":2},{"e":"Moral outrage","d":"Anger specifically fueled by a sense of injustice toward others","v":-3,"n":3,"s":3,"a":-2,"c":3,"aa":3},{"e":"Protectiveness","d":"Strong urge to shield someone you care about from harm","v":2,"n":3,"s":3,"a":3,"c":3,"aa":3},{"e":"Possessiveness","d":"Anxious controlling urge to keep someone close and away from others","v":-2,"n":2,"s":3,"a":-2,"c":3,"aa":2},{"e":"Giddiness","d":"Bubbly slightly dizzy excitement that's hard to contain","v":3,"n":3,"s":2,"a":2,"c":0,"aa":3},{"e":"Sentimentality","d":"Soft warm feeling triggered by meaningful memories or objects","v":2,"n":-2,"s":2,"a":0,"c":3,"aa":2},{"e":"Overwhelmed gratitude","d":"Gratitude so big it almost hurts and brings you close to tears","v":3,"n":0,"s":3,"a":-2,"c":3,"aa":3},{"e":"Existential dread","d":"Vague profound unease about life's meaning or your own mortality","v":-3,"n":-2,"s":-2,"a":-3,"c":-3,"aa":-3},{"e":"Dissociation","d":"Floating disconnected feeling where nothing seems fully real","v":0,"n":-3,"s":-3,"a":-3,"c":-3,"aa":-3},{"e":"Anticipatory grief","d":"Sadness that comes before an expected loss has even happened","v":-2,"n":0,"s":2,"a":-2,"c":2,"aa":-2},{"e":"Overwhelmed love","d":"Feeling overtaken by how much you feel for someone almost painfully","v":2,"n":2,"s":3,"a":-2,"c":-2,"aa":3},{"e":"Anticipatory anxiety","d":"Nervous activation about something that hasn't happened yet","v":-2,"n":3,"s":0,"a":-3,"c":-2,"aa":-3}];
+
+// ── Quiz ───────────────────────────────────────────────────────────────────
+const QUESTIONS = [
+  { dim:"v",  text:"Overall, does this feeling feel good or bad?",          lo:"Very bad",                    hi:"Very good" },
+  { dim:"n",  text:"How does it affect your energy level?",                  lo:"Very draining / exhausting",  hi:"Very activating / energized" },
+  { dim:"s",  text:"How much does this feeling involve other people?",       lo:"Entirely internal — about me", hi:"Completely about others" },
+  { dim:"a",  text:"How in control do you feel right now?",                  lo:"Very powerless / trapped",    hi:"Very in control" },
+  { dim:"c",  text:"How clearly do you understand what caused this feeling?",lo:"No idea — it just hit me",    hi:"Very clear — I know exactly why" },
+  { dim:"aa", text:"Does this feeling make you want to move toward something or away from it?", lo:"Strongly away — escape / avoid", hi:"Strongly toward — engage / get closer" },
+];
+
+const LABELS = {"-3":"Strongly","−2":"Moderately","−1":"Slightly","0":"Neutral","1":"Slightly","2":"Moderately","3":"Strongly"};
+
+let qIndex = 0, answers = {}, selectedVal = null;
+
+const quiz        = document.getElementById("quiz");
+const results     = document.getElementById("results");
+const progLabel   = document.getElementById("prog-label");
+const progFill    = document.getElementById("prog-fill");
+const qText       = document.getElementById("q-text");
+const scaleLabels = document.getElementById("scale-labels");
+const slider      = document.getElementById("slider");
+const sliderVal   = document.getElementById("slider-val");
+const nextBtn     = document.getElementById("next-btn");
+const backBtn     = document.getElementById("back-btn");
+const resultCards = document.getElementById("result-cards");
+const againBtn    = document.getElementById("again-btn");
+
+function updateSliderLabel(q) {
+  const v = parseInt(slider.value);
+  const side = v < 0 ? q.lo : v > 0 ? q.hi : "Neutral";
+  const mag  = LABELS[String(v)] || "";
+  sliderVal.innerHTML = `<span style="color:var(--subtext);font-size:.85rem;">${mag}</span> ${v === 0 ? "— Neutral" : "— " + side}`;
+}
+
+function showQuestion() {
+  const q = QUESTIONS[qIndex];
+  progLabel.textContent = `Question ${qIndex+1} of ${QUESTIONS.length}`;
+  progFill.style.width  = `${(qIndex / QUESTIONS.length) * 100}%`;
+  qText.textContent     = q.text;
+  scaleLabels.innerHTML = `<span>${q.lo}</span><span>${q.hi}</span>`;
+  slider.value = answers[q.dim] !== undefined ? answers[q.dim] : 0;
+  updateSliderLabel(q);
+  backBtn.disabled = qIndex === 0;
+  nextBtn.textContent = qIndex === QUESTIONS.length - 1 ? "See Results →" : "Next →";
+}
+
+slider.addEventListener("input", () => updateSliderLabel(QUESTIONS[qIndex]));
+
+backBtn.addEventListener("click", () => { if (qIndex > 0) { qIndex--; showQuestion(); } });
+
+nextBtn.addEventListener("click", () => {
+  answers[QUESTIONS[qIndex].dim] = parseInt(slider.value);
+  qIndex++;
+  if (qIndex < QUESTIONS.length) { showQuestion(); }
+  else { showResults(); }
+});
+
+function score(em) {
+  return Math.sqrt(Object.keys(answers).reduce((s,d) => s + (em[d]-answers[d])**2, 0));
+}
+
+function showResults() {
+  quiz.style.display    = "none";
+  results.style.display = "block";
+  const top  = [...EMOTIONS].sort((a,b)=>score(a)-score(b)).slice(0,3);
+  const meta = [{cls:"first",rank:"Most likely"},{cls:"second",rank:"Also possible"},{cls:"third",rank:"Or maybe"}];
+  resultCards.innerHTML = "";
+  top.forEach((em,i) => {
+    const {cls,rank} = meta[i];
+    const card = document.createElement("div");
+    card.className = `result-card ${cls}`;
+    card.innerHTML = `<div class="result-rank">${rank}</div>
+      <div class="result-name">${em.e}</div>
+      <div class="result-desc">${em.d}</div>`;
+    resultCards.appendChild(card);
+  });
+}
+
+againBtn.addEventListener("click", () => {
+  qIndex=0; answers={}; selectedVal=null;
+  results.style.display="none"; quiz.style.display="block";
+  showQuestion();
+});
+
+showQuestion();
+
+// ── Editor ─────────────────────────────────────────────────────────────────
+const DIMS = [
+  {key:"v",  label:"Valence"},
+  {key:"n",  label:"Energy"},
+  {key:"s",  label:"Social"},
+  {key:"a",  label:"Agency"},
+  {key:"c",  label:"Certainty"},
+  {key:"aa", label:"Approach"},
+];
+
+const overlay     = document.getElementById("editor-overlay");
+const trigger     = document.getElementById("editor-trigger");
+const closeBtn    = document.getElementById("ed-close-btn");
+const exportMsg   = document.getElementById("export-msg");
+const emSearch    = document.getElementById("em-search");
+const emList      = document.getElementById("em-list");
+const emAddBtn    = document.getElementById("em-add-btn");
+const editPanel   = document.getElementById("em-edit-panel");
+const tabs        = document.querySelectorAll(".ed-tab");
+const edEmotions  = document.getElementById("ed-emotions");
+const edTheme     = document.getElementById("ed-theme");
+
+let editIndex = null;
+
+// Sort once at startup so first open is already alphabetical
+EMOTIONS.sort((a,b) => a.e.localeCompare(b.e));
+
+trigger.addEventListener("click", () => {
+  overlay.classList.add("open");
+  renderEmList();
+  syncThemePickers();
+});
+closeBtn.addEventListener("click", () => overlay.classList.remove("open"));
+overlay.addEventListener("click", e => { if (e.target === overlay) overlay.classList.remove("open"); });
+
+// tabs
+tabs.forEach(tab => {
+  tab.addEventListener("click", () => {
+    tabs.forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    const t = tab.dataset.tab;
+    edEmotions.style.display = t === "emotions" ? "flex" : "none";
+    edTheme.style.display    = t === "theme"    ? "block" : "none";
+  });
+});
+
+// list — always sorted alphabetically
+function renderEmList(filter="") {
+  emList.innerHTML = "";
+  const f = filter.toLowerCase();
+  EMOTIONS.forEach((em, i) => {
+    if (f && !em.e.toLowerCase().includes(f)) return;
+    const div = document.createElement("div");
+    div.className = "em-item" + (i === editIndex ? " selected" : "");
+    div.dataset.idx = i;
+    div.textContent = em.e;
+    div.addEventListener("click", () => { editIndex = i; renderEmList(emSearch.value); scrollToSelected(); renderEditPanel(); });
+    emList.appendChild(div);
+  });
+}
+
+function scrollToSelected() {
+  const sel = emList.querySelector(".em-item.selected");
+  if (sel) sel.scrollIntoView({block:"nearest", behavior:"smooth"});
+}
+
+emSearch.addEventListener("input", () => renderEmList(emSearch.value));
+
+emAddBtn.addEventListener("click", () => {
+  const newEm = {e:"New Emotion",d:"Description of the emotion.",v:0,n:0,s:0,a:0,c:0,aa:0};
+  EMOTIONS.push(newEm);
+  EMOTIONS.sort((a,b) => a.e.localeCompare(b.e));
+  editIndex = EMOTIONS.findIndex(em => em === newEm);
+  emSearch.value = "";
+  renderEmList("");
+  scrollToSelected();
+  renderEditPanel();
+});
+
+// edit panel
+function renderEditPanel() {
+  if (editIndex === null) { editPanel.className="em-edit-panel empty"; editPanel.innerHTML="<span>← Select an emotion to edit</span>"; return; }
+  const em = EMOTIONS[editIndex];
+  editPanel.className = "em-edit-panel";
+
+  let dimRows = DIMS.map(d => `
+    <div class="dim-row">
+      <div class="dim-label">${d.label}</div>
+      <input type="range" class="dim-slider" data-dim="${d.key}" min="-3" max="3" step="1" value="${em[d.key]}">
+      <div class="dim-val" id="dv-${d.key}">${em[d.key]}</div>
+    </div>`).join("");
+
+  editPanel.innerHTML = `
+    <div class="ed-field">
+      <div class="ed-label">Name</div>
+      <input type="text" class="ed-input" id="ed-name" value="${em.e}" maxlength="60">
+    </div>
+    <div class="ed-field">
+      <div class="ed-label">Description</div>
+      <textarea class="ed-input" id="ed-desc" maxlength="300">${em.d}</textarea>
+    </div>
+    <div class="ed-label" style="margin-bottom:8px;">Dimensions</div>
+    ${dimRows}
+    <div id="radar-wrap"></div>
+    <div class="ed-actions">
+      <button class="ed-save-btn" id="ed-save">Save</button>
+      <button class="ed-del-btn" id="ed-del">Delete</button>
+    </div>`;
+
+  drawRadar(em);
+
+  editPanel.querySelectorAll(".dim-slider").forEach(sl => {
+    sl.addEventListener("input", () => {
+      document.getElementById("dv-" + sl.dataset.dim).textContent = sl.value;
+      drawRadar(getLiveVals());
+    });
+  });
+
+  document.getElementById("ed-save").addEventListener("click", saveEmotion);
+  document.getElementById("ed-del").addEventListener("click", deleteEmotion);
+}
+
+function getLiveVals() {
+  const vals = {};
+  editPanel.querySelectorAll(".dim-slider").forEach(sl => vals[sl.dataset.dim] = parseInt(sl.value));
+  return vals;
+}
+
+function saveEmotion() {
+  const nameRaw = document.getElementById("ed-name").value.trim();
+  const descRaw = document.getElementById("ed-desc").value.trim();
+  if (!nameRaw) return;
+  const name = sanitize(nameRaw);
+  const desc = sanitize(descRaw);
+  const dims = {};
+  DIMS.forEach(d => dims[d.key] = sanitizeNum(document.querySelector(`.dim-slider[data-dim="${d.key}"]`).value, -3, 3));
+  const updated = {e: name, d: desc, ...dims};
+  EMOTIONS[editIndex] = updated;
+  EMOTIONS.sort((a,b) => a.e.localeCompare(b.e));
+  editIndex = EMOTIONS.indexOf(updated);
+  renderEmList(emSearch.value);
+  scrollToSelected();
+  renderEditPanel();
+}
+
+function deleteEmotion() {
+  if (EMOTIONS.length <= 1) return;
+  EMOTIONS.splice(editIndex, 1);
+  editIndex = null;
+  renderEmList(emSearch.value);
+  editPanel.className="em-edit-panel empty";
+  editPanel.innerHTML="<span>← Select an emotion to edit</span>";
+}
+
+// radar chart
+function drawRadar(em) {
+  const wrap = document.getElementById("radar-wrap");
+  if (!wrap) return;
+  const W = 220, H = 220, cx = 110, cy = 110, R = 78;
+  const labels = ["Valence","Energy","Social","Agency","Certainty","Approach"];
+  const keys   = ["v","n","s","a","c","aa"];
+  const n      = keys.length;
+  const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent").trim() || "#a78bfa";
+  const subtext= getComputedStyle(document.documentElement).getPropertyValue("--subtext").trim() || "#94a3b8";
+  const btn    = getComputedStyle(document.documentElement).getPropertyValue("--btn").trim() || "#3b3b5c";
+
+  const angle  = i => (Math.PI * 2 * i / n) - Math.PI / 2;
+  const pt     = (i, r) => [cx + r * Math.cos(angle(i)), cy + r * Math.sin(angle(i))];
+
+  // grid rings
+  let rings = "";
+  [1,2,3].forEach(step => {
+    const r = (step/3)*R;
+    const pts = Array.from({length:n},(_,i)=>pt(i,r)).map(p=>p.join(",")).join(" ");
+    rings += `<polygon points="${pts}" fill="none" stroke="${btn}" stroke-width="1"/>`;
+  });
+
+  // axes
+  let axes = keys.map((_,i) => {
+    const [x,y] = pt(i,R);
+    return `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${btn}" stroke-width="1"/>`;
+  }).join("");
+
+  // data polygon
+  const dataR = i => { const v = em[keys[i]]||0; return ((v+3)/6)*R; };
+  const dataPts = Array.from({length:n},(_,i)=>pt(i,dataR(i))).map(p=>p.join(",")).join(" ");
+
+  // labels
+  let lbls = labels.map((lbl,i) => {
+    const [x,y] = pt(i, R+18);
+    const anchor = x < cx-4 ? "end" : x > cx+4 ? "start" : "middle";
+    return `<text x="${x}" y="${y}" text-anchor="${anchor}" dominant-baseline="middle" font-size="9" fill="${subtext}">${lbl}</text>`;
+  }).join("");
+
+  wrap.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    ${rings}${axes}
+    <polygon points="${dataPts}" fill="${accent}" fill-opacity=".25" stroke="${accent}" stroke-width="2"/>
+    ${lbls}
+  </svg>`;
+}
+
+// theme
+const themeMap = {
+  "tc-bg":"--bg","tc-card":"--card","tc-accent":"--accent",
+  "tc-accent2":"--accent2","tc-text":"--text","tc-btn":"--btn"
+};
+
+function syncThemePickers() {
+  const root = document.documentElement;
+  Object.entries(themeMap).forEach(([id, varName]) => {
+    const el = document.getElementById(id);
+    if (el) el.value = rgbToHex(getComputedStyle(root).getPropertyValue(varName).trim());
+  });
+}
+
+function rgbToHex(color) {
+  if (color.startsWith("#")) return color.length === 4
+    ? "#" + [...color.slice(1)].map(c=>c+c).join("") : color;
+  const m = color.match(/\d+/g);
+  if (!m) return "#ffffff";
+  return "#" + m.slice(0,3).map(x=>parseInt(x).toString(16).padStart(2,"0")).join("");
+}
+
+Object.entries(themeMap).forEach(([id, varName]) => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener("input", () => {
+    document.documentElement.style.setProperty(varName, el.value);
+    if (editIndex !== null) drawRadar(EMOTIONS[editIndex]);
+  });
+});
+
+// ── Export helpers ─────────────────────────────────────────────────────────
+function getCurrentCssVars() {
+  const root = document.documentElement;
+  return Object.entries(themeMap).map(([,v]) =>
+    `      ${v}:${getComputedStyle(root).getPropertyValue(v).trim()};`
+  ).join("\n");
+}
+
+function buildQuizOnlyHTML(emotionJSON, cssVars) {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Emotion Finder</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+${cssVars}
+      --green:#4ade80; --yellow:#facc15; --orange:#fb923c; --radius:12px;
+    }
+    body { background:var(--bg); color:var(--text); font-family:"Segoe UI",system-ui,sans-serif;
+      min-height:100vh; display:flex; justify-content:center; align-items:flex-start; padding:40px 16px 60px; }
+    .shell { width:100%; max-width:540px; }
+    header { text-align:center; margin-bottom:24px; }
+    header h1 { font-size:1.9rem; color:var(--accent); }
+    header p  { color:var(--subtext); margin-top:6px; font-size:0.93rem; }
+    .progress-area { margin-bottom:16px; }
+    .progress-label { text-align:right; font-size:0.8rem; color:var(--subtext); margin-bottom:4px; }
+    .progress-track { height:6px; background:var(--btn); border-radius:99px; overflow:hidden; }
+    .progress-fill  { height:100%; background:var(--accent); border-radius:99px; transition:width .35s ease; }
+    .card { background:var(--card); border-radius:var(--radius); padding:24px 24px 20px; margin-bottom:20px; }
+    .question-text { font-size:1.1rem; line-height:1.5; margin-bottom:18px; }
+    .scale-labels { display:flex; justify-content:space-between; font-size:0.78rem;
+      color:var(--subtext); margin-bottom:14px; padding:0 2px; line-height:1.4; }
+    .slider { -webkit-appearance:none; appearance:none; width:100%; height:6px; border-radius:99px;
+      background:var(--btn); outline:none; cursor:pointer; }
+    .slider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none;
+      width:28px; height:28px; border-radius:50%; background:var(--accent); cursor:pointer;
+      border:3px solid #1e1e2e; box-shadow:0 0 0 2px var(--accent); }
+    .slider::-moz-range-thumb { width:28px; height:28px; border-radius:50%;
+      background:var(--accent); cursor:pointer; border:3px solid #1e1e2e; }
+    .slider:focus::-webkit-slider-thumb { box-shadow:0 0 0 5px rgba(167,139,250,.35); }
+    .slider-val { text-align:center; font-size:1.4rem; font-weight:700;
+      color:var(--accent); margin-top:14px; min-height:2rem; }
+    .nav-row { display:flex; gap:10px; }
+    #back-btn { padding:13px 20px; background:var(--btn); color:var(--subtext);
+      border:none; border-radius:var(--radius); font-size:1rem; font-weight:700; cursor:pointer; }
+    #back-btn:hover { background:var(--btnhov); color:var(--text); }
+    #back-btn:disabled { opacity:.25; cursor:not-allowed; }
+    #next-btn { flex:1; display:block; width:100%; padding:13px;
+      background:var(--accent); color:white; border:none;
+      border-radius:var(--radius); font-size:1rem; font-weight:700; cursor:pointer; }
+    #next-btn:not(:disabled):hover { background:var(--accent2); }
+    #results { display:none; }
+    .result-heading { text-align:center; color:var(--subtext); font-size:1rem; margin-bottom:16px; }
+    .result-card { background:var(--card); border-radius:var(--radius);
+      padding:20px 24px; margin-bottom:14px; border-left:4px solid; }
+    .result-card.first  { border-color:var(--green);  }
+    .result-card.second { border-color:var(--yellow); }
+    .result-card.third  { border-color:var(--orange); }
+    .result-rank { font-size:.75rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; margin-bottom:4px; }
+    .result-card.first  .result-rank { color:var(--green);  }
+    .result-card.second .result-rank { color:var(--yellow); }
+    .result-card.third  .result-rank { color:var(--orange); }
+    .result-name { font-size:1.5rem; font-weight:700; margin-bottom:6px; }
+    .result-card.first  .result-name { color:var(--green);  }
+    .result-card.second .result-name { color:var(--yellow); }
+    .result-card.third  .result-name { color:var(--orange); }
+    .result-desc { font-size:.93rem; color:var(--text); line-height:1.5; }
+    #again-btn { display:block; width:100%; padding:13px; background:var(--btn); color:var(--text);
+      border:none; border-radius:var(--radius); font-size:1rem; font-weight:700;
+      cursor:pointer; margin-top:20px; }
+    #again-btn:hover { background:var(--btnhov); }
+  </style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <h1>🧭 Emotion Finder</h1>
+    <p>Answer 6 questions — I'll name what you're feeling.</p>
+  </header>
+  <div id="quiz">
+    <div class="progress-area">
+      <div class="progress-label" id="prog-label">Question 1 of 6</div>
+      <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+    <div class="card">
+      <div class="question-text" id="q-text"></div>
+      <div class="scale-labels" id="scale-labels"></div>
+      <input type="range" class="slider" id="slider" min="-3" max="3" step="1" value="0">
+      <div class="slider-val" id="slider-val">0 <span>— Neutral</span></div>
+    </div>
+    <div class="nav-row">
+      <button id="back-btn" disabled>← Back</button>
+      <button id="next-btn">Next →</button>
+    </div>
+  </div>
+  <div id="results">
+    <p class="result-heading">You might be feeling…</p>
+    <div id="result-cards"></div>
+    <button id="again-btn">↺ Try Again</button>
+  </div>
+</div>
+<scr` + `ipt>
+const EMOTIONS = ${emotionJSON};
+const QUESTIONS = [
+  { dim:"v",  text:"Overall, does this feeling feel good or bad?",           lo:"Very bad",                     hi:"Very good" },
+  { dim:"n",  text:"How does it affect your energy level?",                   lo:"Very draining / exhausting",   hi:"Very activating / energized" },
+  { dim:"s",  text:"How much does this feeling involve other people?",        lo:"Entirely internal — about me", hi:"Completely about others" },
+  { dim:"a",  text:"How in control do you feel right now?",                   lo:"Very powerless / trapped",     hi:"Very in control" },
+  { dim:"c",  text:"How clearly do you understand what caused this feeling?", lo:"No idea — it just hit me",     hi:"Very clear — I know exactly why" },
+  { dim:"aa", text:"Does this feeling make you want to move toward something or away from it?", lo:"Strongly away — escape / avoid", hi:"Strongly toward — engage / get closer" },
+];
+const LABELS = {"-3":"Strongly","-2":"Moderately","-1":"Slightly","0":"Neutral","1":"Slightly","2":"Moderately","3":"Strongly"};
+let qIndex=0, answers={};
+const quiz=document.getElementById("quiz"), results=document.getElementById("results");
+const progLabel=document.getElementById("prog-label"), progFill=document.getElementById("prog-fill");
+const qText=document.getElementById("q-text"), scaleLabels=document.getElementById("scale-labels");
+const slider=document.getElementById("slider"), sliderVal=document.getElementById("slider-val");
+const nextBtn=document.getElementById("next-btn"), backBtn=document.getElementById("back-btn");
+const resultCards=document.getElementById("result-cards"), againBtn=document.getElementById("again-btn");
+function updateSliderLabel(q){const v=parseInt(slider.value);const side=v<0?q.lo:v>0?q.hi:"Neutral";const mag=LABELS[String(v)]||"";sliderVal.innerHTML=\`<span style="color:var(--subtext);font-size:.85rem;">\${mag}</span> \${v===0?"— Neutral":"— "+side}\`;}
+function showQuestion(){const q=QUESTIONS[qIndex];progLabel.textContent=\`Question \${qIndex+1} of \${QUESTIONS.length}\`;progFill.style.width=\`\${(qIndex/QUESTIONS.length)*100}%\`;qText.textContent=q.text;scaleLabels.innerHTML=\`<span>\${q.lo}</span><span>\${q.hi}</span>\`;slider.value=answers[q.dim]!==undefined?answers[q.dim]:0;updateSliderLabel(q);backBtn.disabled=qIndex===0;nextBtn.textContent=qIndex===QUESTIONS.length-1?"See Results →":"Next →";}
+slider.addEventListener("input",()=>updateSliderLabel(QUESTIONS[qIndex]));
+backBtn.addEventListener("click",()=>{if(qIndex>0){qIndex--;showQuestion();}});
+nextBtn.addEventListener("click",()=>{answers[QUESTIONS[qIndex].dim]=parseInt(slider.value);qIndex++;if(qIndex<QUESTIONS.length){showQuestion();}else{showResults();}});
+function score(em){return Math.sqrt(Object.keys(answers).reduce((s,d)=>s+(em[d]-answers[d])**2,0));}
+function showResults(){quiz.style.display="none";results.style.display="block";const top=[...EMOTIONS].sort((a,b)=>score(a)-score(b)).slice(0,3);const meta=[{cls:"first",rank:"Most likely"},{cls:"second",rank:"Also possible"},{cls:"third",rank:"Or maybe"}];resultCards.innerHTML="";top.forEach((em,i)=>{const{cls,rank}=meta[i];const card=document.createElement("div");card.className=\`result-card \${cls}\`;card.innerHTML=\`<div class="result-rank">\${rank}</div><div class="result-name">\${em.e}</div><div class="result-desc">\${em.d}</div>\`;resultCards.appendChild(card);});}
+againBtn.addEventListener("click",()=>{qIndex=0;answers={};results.style.display="none";quiz.style.display="block";showQuestion();});
+showQuestion();
+</scr` + `ipt>
+</body>
+</html>`;
+}
+
+function triggerDownload(html, filename) {
+  const blob = new Blob([html], {type:"text/html"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  exportMsg.style.opacity = "1";
+  setTimeout(() => exportMsg.style.opacity = "0", 2500);
+}
+
+function doExport(clean) {
+  const filename = (prompt("Filename:", clean ? "emotion_finder_clean" : "emotion_finder_editor") || (clean ? "emotion_finder_clean" : "emotion_finder_editor"))
+    .replace(/[^a-zA-Z0-9_\-]/g, "_") + ".html";
+  const emotionJSON = JSON.stringify(EMOTIONS);
+  const cssVars = getCurrentCssVars();
+
+  if (clean) {
+    triggerDownload(buildQuizOnlyHTML(emotionJSON, cssVars), filename);
+    return;
+  }
+
+  // Editor export: fetch original file source to avoid live-DOM serialization issues
+  fetch(location.href)
+    .then(r => r.text())
+    .then(source => {
+      const styleOverride = Object.entries(themeMap)
+        .map(([,v]) => `${v}:${getComputedStyle(document.documentElement).getPropertyValue(v).trim()}`)
+        .join(";");
+      const out = source
+        .replace(/let EMOTIONS = \[[\s\S]*?\];/, `let EMOTIONS = ${emotionJSON};`)
+        .replace(/:root\s*\{[^}]*\}/, `:root { ${styleOverride}; --green:#4ade80; --yellow:#facc15; --orange:#fb923c; --radius:12px; }`);
+      triggerDownload(out, filename);
+    })
+    .catch(() => {
+      // Fallback if fetch is blocked
+      const styleTag = `<style>:root{${Object.entries(themeMap).map(([,v])=>`${v}:${getComputedStyle(document.documentElement).getPropertyValue(v).trim()}`).join(";")}}</style>`;
+      triggerDownload("<!DOCTYPE html>\n" + document.documentElement.outerHTML.replace("</head>", styleTag + "</head>"), filename);
+    });
+}
+
+const exportBtn      = document.getElementById("ed-export-btn");
+const exportCleanBtn = document.getElementById("ed-export-clean-btn");
+exportBtn.addEventListener("click",      () => doExport(false));
+exportCleanBtn.addEventListener("click", () => doExport(true));
+</script>
+</body>
+</html>
