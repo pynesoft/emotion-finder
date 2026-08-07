@@ -2,6 +2,8 @@
 
 A lightweight, self-contained tool that helps you identify what you're feeling through six simple questions.
 
+https://pynesoft.github.io/emotion-finder/
+
 Accurately naming an emotion is a foundational skill in therapies like Cognitive Behavioral Therapy (CBT). Emotion Finder uses a dimensional scoring model to triangulate your emotional state from 123 emotions, helping you move from "I feel bad" to something more precise — which is the first step toward working with it.
 
 ## How it works
